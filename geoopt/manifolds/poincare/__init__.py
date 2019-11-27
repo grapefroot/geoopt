@@ -3,9 +3,11 @@ from typing import Tuple, Optional
 from . import math
 import geoopt
 from ...utils import size2shape, broadcast_shapes
+from ...tensor import ManifoldTensor
 from ..base import Manifold, ScalingInfo
+from ..product import ProductManifold
 
-__all__ = ["PoincareBall", "PoincareBallExact"]
+__all__ = ["PoincareBall", "PoincareBallExact", "PoincareTensor"]
 
 _poincare_ball_doc = r"""
     Poincare ball model, see more in :doc:`/extended/poincare`.
@@ -369,3 +371,30 @@ class PoincareBallExact(PoincareBall):
 
     def extra_repr(self):
         return "exact"
+
+
+class PoincareTensor(ManifoldTensor):
+    manifold: PoincareBall
+
+    def __new__(cls, *args, manifold: PoincareBall = PoincareBall(), requires_grad=False, **kwargs) -> 'PoincareTensor':
+        return ManifoldTensor.__new__(cls, *args, manifold=manifold, requires_grad=requires_grad, **kwargs)
+
+    #addition becomes mobius addition
+    def __add__(self, other: 'PoincareTensor') -> 'PoincareTensor':
+        # Note that types of manifolds are not checked, proceed at your own risk
+        # if type(other) != type(other):
+        #     raise TypeError
+        new_data = self.manifold.mobius_add(self.data, other.data)
+        return PoincareTensor(new_data, manifold=self.manifold, requires_grad=new_data.requires_grad)
+
+    def __neg__(self):
+        new_data = -self.data
+        return PoincareTensor(new_data, manifold=self.manifold, requires_grad=new_data.requires_grad)
+
+    def __sub__(self, other: 'PoincareTensor') -> 'PoincareTensor':
+        new_data = self.manifold.mobius_sub(self.data, other.data)
+        return PoincareTensor(new_data, manifold=self.manifold, requires_grad=new_data.requires_grad)
+
+class PoincareProductManifold(ProductManifold):
+    def __add__(self, other):
+        pass
